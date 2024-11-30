@@ -106,6 +106,37 @@ app.get("/time-logs", async (req, res) => {
   }
 });
 
+app.put("/edit-log", async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+
+    if (!token || !token.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized: Invalid token format" });
+    }
+
+    const apiUrl = `${process.env.API_BASE_URL}/Admin/editLogOnBehalf`;
+
+    const response = await fetch(apiUrl, {
+      method: "PUT",
+      headers: {
+        "Authorization": token,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(req.body), // Forward the body to the API
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.message || "Failed to update log" });
+    }
+
+    res.status(200).json(data);
+  } catch (error) {
+    res.status(500).json({ error: "Error updating the time log." });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`Proxy server running on http://localhost:${PORT}`);
