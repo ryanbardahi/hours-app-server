@@ -69,6 +69,44 @@ app.get("/all-clients", async (req, res) => {
   }
 });
 
+app.get("/time-logs", async (req, res) => {
+  try {
+    const token = req.headers.authorization;
+
+    if (!token || !token.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Unauthorized: Invalid token format" });
+    }
+
+    const { DateFrom, DateTo } = req.query;
+
+    if (!DateFrom || !DateTo) {
+      return res.status(400).json({ error: "Missing required query parameters" });
+    }
+
+    const apiUrl = `${process.env.API_BASE_URL}/Reports/activity?DateFrom=${DateFrom}&DateTo=${DateTo}`;
+
+    const response = await fetch(apiUrl, {
+      method: "GET",
+      headers: {
+        "Authorization": token,
+        "Accept": "application/json",
+        "api-version": "1.0",
+      },
+    });
+
+    if (!response.ok) {
+      const errorMessage = await response.text();
+      return res.status(response.status).json({ error: errorMessage });
+    }
+
+    const logs = await response.json();
+    res.status(200).json(logs);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch time logs. Please try again later." });
+  }
+});
+
+
 app.listen(PORT, () => {
   console.log(`Proxy server running on http://localhost:${PORT}`);
 });
