@@ -9,7 +9,7 @@ const app = express();
 const PORT = 4000;
 
 const corsOptions = {
-  origin: ["http://localhost:3000","http://hours-app-jade.vercel.app"],
+  origin: ["http://localhost:3000","https://hours-app-jade.vercel.app"],
   credentials: true,
   optionsSuccessStatus: 200
 };
