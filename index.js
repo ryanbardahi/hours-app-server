@@ -44,7 +44,7 @@ app.get("/all-clients", async (req, res) => {
     const response = await fetch(apiUrl, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${req.headers.authorization}`
+        "Authorization": `Bearer ${req.headers.authorization}`,
         "Content-Type": "application/json",
       },
     });
