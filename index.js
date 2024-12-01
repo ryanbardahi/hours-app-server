@@ -321,10 +321,10 @@ app.post("/write-to-sheet", async (req, res) => {
     // Prepare rows
     const rows = [];
     const dateRowIndices = [];
-    let totalBillable = 0;
-    let totalLaborHours = 0;
+    let totalBillable = 0; // Ensure declared only once
+    let totalLaborHoursAccumulator = 0; // Renamed to avoid conflict
 
-    sortedDates.forEach((date, idx) => {
+    sortedDates.forEach((date) => {
       const logs = groupedData[date];
       const billableAmount = logs.reduce((sum, log) => sum + log[5], 0);
       const laborHours = logs.reduce((sum, log) => sum + log[7], 0);
@@ -342,13 +342,13 @@ app.post("/write-to-sheet", async (req, res) => {
 
       // Accumulate totals
       totalBillable += billableAmount;
-      totalLaborHours += laborHours;
+      totalLaborHoursAccumulator += laborHours;
     });
 
     // Add total row
     rows.push([
       "TOTAL", "", "", "", "",
-      totalBillable, "", totalLaborHours, "", ""
+      totalBillable, "", totalLaborHoursAccumulator, "", ""
     ]);
 
     // Write data to sheet
@@ -368,6 +368,7 @@ app.post("/write-to-sheet", async (req, res) => {
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
+
 
 
 app.post("/login", async (req, res) => {
