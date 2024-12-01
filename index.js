@@ -28,20 +28,25 @@ const sheets = google.sheets({ version: "v4", auth });
 
 app.post("/write-to-sheet", async (req, res) => {
   try {
-    const { text } = req.body;
+    const { data } = req.body; // Expecting data to be an array of arrays
+
+    if (!data || !Array.isArray(data)) {
+      return res.status(400).json({ error: "Invalid data format. Expected an array of arrays." });
+    }
 
     // Define the spreadsheet ID
     const spreadsheetId = process.env.SPREADSHEET_ID;
 
     // Get existing sheets to check if "Detailed Report" exists
     const sheetMetadata = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheetExists = sheetMetadata.data.sheets.some(
+    const sheet = sheetMetadata.data.sheets.find(
       (sheet) => sheet.properties.title === "Detailed Report"
     );
 
-    if (!sheetExists) {
+    let detailedReportSheetId;
+    if (!sheet) {
       // Create the "Detailed Report" sheet if it doesn't exist
-      await sheets.spreadsheets.batchUpdate({
+      const addSheetResponse = await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
           requests: [
@@ -55,35 +60,211 @@ app.post("/write-to-sheet", async (req, res) => {
           ],
         },
       });
+      detailedReportSheetId = addSheetResponse.data.replies[0].addSheet.properties.sheetId;
       console.log('"Detailed Report" sheet created.');
     } else {
+      detailedReportSheetId = sheet.properties.sheetId;
       // Clear the existing "Detailed Report" sheet content
-      const rangeToClear = "Detailed Report";
       await sheets.spreadsheets.values.clear({
         spreadsheetId,
-        range: rangeToClear,
+        range: "Detailed Report",
       });
       console.log('"Detailed Report" sheet cleared.');
     }
 
-    // Write data to the "Detailed Report" sheet
-    const range = "Detailed Report!A1";
-    await sheets.spreadsheets.values.update({
+    // Apply formatting
+    const requestsBatch = [
+      // 1. Format Column A as Text
+      {
+        repeatCell: {
+          range: {
+            sheetId: detailedReportSheetId,
+            startColumnIndex: 0,
+            endColumnIndex: 1,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'TEXT',
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat',
+        },
+      },
+      // 2. Format Cell A1
+      {
+        updateCells: {
+          rows: [{
+            values: [{
+              userEnteredValue: { stringValue: 'DETAILED REPORT' },
+              userEnteredFormat: {
+                textFormat: {
+                  fontFamily: 'Calibri',
+                  fontSize: 22,
+                  bold: true,
+                  foregroundColor: { red: 59/255, green: 143/255, blue: 194/255 },
+                },
+              },
+            }],
+          }],
+          fields: 'userEnteredValue,userEnteredFormat.textFormat',
+          start: { sheetId: detailedReportSheetId, rowIndex: 0, columnIndex: 0 },
+        },
+      },
+      // 3. Format Cells A2 to A5
+      {
+        updateCells: {
+          rows: [
+            { values: [{ userEnteredValue: { stringValue: 'Time frame' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Billable amount (hours)' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Total billable amount' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Total hours' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
+          ],
+          fields: 'userEnteredValue,userEnteredFormat.textFormat',
+          start: { sheetId: detailedReportSheetId, rowIndex: 1, columnIndex: 0 },
+        },
+      },
+      // 4. Format Cells B2 to B5
+      {
+        repeatCell: {
+          range: {
+            sheetId: detailedReportSheetId,
+            startRowIndex: 1,
+            endRowIndex: 5,
+            startColumnIndex: 1,
+            endColumnIndex: 2,
+          },
+          cell: {
+            userEnteredFormat: {
+              textFormat: {
+                fontFamily: 'Calibri',
+                fontSize: 12,
+                bold: false,
+                foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 },
+              },
+            },
+          },
+          fields: 'userEnteredFormat.textFormat',
+        },
+      },
+      // 5. Set Headers in Row 8
+      {
+        updateCells: {
+          rows: [{
+            values: [
+              { userEnteredValue: { stringValue: 'USER' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'CLIENT' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'PROJECT' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'TASK' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'IS BILLABLE' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'BILLABLE AMOUNT' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'START/FINISH TIME' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'TOTAL HOURS' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'BILLABLE HOURS' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'DESCRIPTION' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+            ],
+          }],
+          fields: 'userEnteredValue,userEnteredFormat.textFormat',
+          start: { sheetId: detailedReportSheetId, rowIndex: 7, columnIndex: 0 },
+        },
+      },
+      // 6. Set Column Widths
+      // Column A
+      {
+        updateDimensionProperties: {
+          range: {
+            sheetId: detailedReportSheetId,
+            dimension: 'COLUMNS',
+            startIndex: 0,
+            endIndex: 1,
+          },
+          properties: {
+            pixelSize: 250,
+          },
+          fields: 'pixelSize',
+        },
+      },
+      // Columns B to I
+      ...[1,2,3,4,5,6,7,8].map(col => ({
+        updateDimensionProperties: {
+          range: {
+            sheetId: detailedReportSheetId,
+            dimension: 'COLUMNS',
+            startIndex: col,
+            endIndex: col + 1,
+          },
+          properties: {
+            pixelSize: 150,
+          },
+          fields: 'pixelSize',
+        },
+      })),
+      // Column J
+      {
+        updateDimensionProperties: {
+          range: {
+            sheetId: detailedReportSheetId,
+            dimension: 'COLUMNS',
+            startIndex: 9,
+            endIndex: 10,
+          },
+          properties: {
+            pixelSize: 500,
+          },
+          fields: 'pixelSize',
+        },
+      },
+      // 7. Wrap Text for All Columns
+      {
+        repeatCell: {
+          range: {
+            sheetId: detailedReportSheetId,
+            startRowIndex: 0,
+            endRowIndex: 1000, // Adjust as needed
+            startColumnIndex: 0,
+            endColumnIndex: 10,
+          },
+          cell: {
+            userEnteredFormat: {
+              wrapStrategy: 'WRAP',
+            },
+          },
+          fields: 'userEnteredFormat.wrapStrategy',
+        },
+      },
+    ];
+
+    await sheets.spreadsheets.batchUpdate({
       spreadsheetId,
-      range,
-      valueInputOption: "RAW",
       requestBody: {
-        values: [[text]], // Data to write
+        requests: requestsBatch,
       },
     });
 
-    res.status(200).json({ message: "Data written successfully!" });
+    console.log('Formatting applied successfully.');
+
+    // 8. Write Data to the Sheet
+    // Assuming data starts from row 9
+    const dataRange = `Detailed Report!A9:J${8 + data.length}`;
+
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: dataRange,
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: data,
+      },
+    });
+
+    console.log('Data written successfully.');
+
+    res.status(200).json({ message: "Detailed Report created and data written successfully!" });
   } catch (error) {
     console.error("Error in /write-to-sheet:", error);
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
-
 
 
 app.post("/login", async (req, res) => {
