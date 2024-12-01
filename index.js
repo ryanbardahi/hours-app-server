@@ -112,7 +112,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
         userEnteredFormat: {
           textFormat: {
             fontSize: 12,
-            bold: false,
+            bold: true,
             foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
           },
         },
