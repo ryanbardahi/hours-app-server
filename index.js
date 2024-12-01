@@ -1,5 +1,3 @@
-// index.js
-
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
@@ -29,7 +27,7 @@ const auth = new google.auth.GoogleAuth({
 const sheets = google.sheets({ version: "v4", auth });
 
 // Helper function to apply formatting
-const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRow) => {
+const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, totalRowIndex) => {
   const requests = [];
 
   // 1. Format Column A as Text
@@ -79,14 +77,13 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRo
     'Total hours',
   ];
 
-  const formattedRows = labels.map((label, index) => ({
+  const formattedRows = labels.map((label) => ({
     values: [{
       userEnteredValue: { stringValue: label },
       userEnteredFormat: {
         textFormat: {
           fontSize: 10,
           bold: false,
-          // Default font color (black)
         },
       },
     }],
@@ -112,9 +109,8 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRo
     userEnteredFormat: {
       textFormat: {
         fontSize: 10,
-        bold: true, // Make headers bold for better visibility
+        bold: true,
       },
-      horizontalAlignment: 'CENTER',
     },
   }));
 
@@ -123,7 +119,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRo
       rows: [{
         values: headerValues,
       }],
-      fields: 'userEnteredValue,userEnteredFormat.textFormat,userEnteredFormat.horizontalAlignment',
+      fields: 'userEnteredValue,userEnteredFormat.textFormat',
       start: { sheetId: sheetId, rowIndex: 7, columnIndex: 0 }, // Row 8
     },
   });
@@ -271,7 +267,65 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRo
     },
   });
 
-  // 10. Format Column F as Currency '£#,##0.00'
+  // 10. Format Date Rows
+  dateRowIndices.forEach((rowIndex) => {
+    // Apply background color and bold text to entire row (A-J)
+    requests.push({
+      repeatCell: {
+        range: {
+          sheetId: sheetId,
+          startRowIndex: rowIndex - 1, // zero-based index
+          endRowIndex: rowIndex,
+          startColumnIndex: 0, // Column A
+          endColumnIndex: 10, // Column J
+        },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: {
+              red: 220 / 255,
+              green: 234 / 255,
+              blue: 250 / 255,
+            },
+            textFormat: {
+              bold: true,
+            },
+          },
+        },
+        fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.bold',
+      },
+    });
+
+    // Specifically bold Columns A, F, H, I
+    ['A', 'F', 'H', 'I'].forEach((col) => {
+      const colIndex = col.charCodeAt(0) - 'A'.charCodeAt(0);
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: rowIndex - 1,
+            endRowIndex: rowIndex,
+            startColumnIndex: colIndex,
+            endColumnIndex: colIndex + 1,
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: {
+                red: 220 / 255,
+                green: 234 / 255,
+                blue: 250 / 255,
+              },
+              textFormat: {
+                bold: true,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.bold',
+        },
+      });
+    });
+  });
+
+  // 11. Format Column F as Currency (GBP)
   requests.push({
     repeatCell: {
       range: {
@@ -291,71 +345,14 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRo
     },
   });
 
-  // 11. Format Date Rows
-  dateRows.forEach((rowIndex) => {
-    requests.push({
-      repeatCell: {
-        range: {
-          sheetId: sheetId,
-          startRowIndex: rowIndex - 1, // zero-based index
-          endRowIndex: rowIndex,
-          startColumnIndex: 0, // Column A
-          endColumnIndex: 10, // Columns A-J
-        },
-        cell: {
-          userEnteredFormat: {
-            backgroundColor: {
-              red: 220/255,
-              green: 234/255,
-              blue: 250/255,
-            },
-            textFormat: {
-              bold: true,
-            },
-          },
-        },
-        fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.bold',
-      },
-    });
-
-    // Specifically bold and set background color for columns A, F, H, I
-    ['A', 'F', 'H', 'I'].forEach((col) => {
-      const colIndex = col.charCodeAt(0) - 'A'.charCodeAt(0);
-      requests.push({
-        repeatCell: {
-          range: {
-            sheetId: sheetId,
-            startRowIndex: rowIndex - 1,
-            endRowIndex: rowIndex,
-            startColumnIndex: colIndex,
-            endColumnIndex: colIndex + 1,
-          },
-          cell: {
-            userEnteredFormat: {
-              backgroundColor: {
-                red: 220/255,
-                green: 234/255,
-                blue: 250/255,
-              },
-              textFormat: {
-                bold: true,
-              },
-            },
-          },
-          fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.bold',
-        },
-      });
-    });
-  });
-
   // 12. Format Total Row
-  if (totalRow) {
+  if (totalRowIndex) {
     requests.push({
       repeatCell: {
         range: {
           sheetId: sheetId,
-          startRowIndex: totalRow - 1,
-          endRowIndex: totalRow,
+          startRowIndex: totalRowIndex - 1,
+          endRowIndex: totalRowIndex,
           startColumnIndex: 0,
           endColumnIndex: 10,
         },
@@ -367,7 +364,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRows, totalRo
             },
           },
         },
-        fields: 'userEnteredFormat.textFormat.bold,userEnteredFormat.textFormat.fontSize',
+        fields: 'userEnteredFormat.textFormat',
       },
     });
   }
@@ -387,6 +384,7 @@ app.post("/write-to-sheet", async (req, res) => {
   try {
     const { data, dateRange, totalBillableAmount, totalLaborHours, totalBillableHours } = req.body;
 
+    // Validate input
     if (!data || !Array.isArray(data)) {
       return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of arrays." });
     }
@@ -395,8 +393,14 @@ app.post("/write-to-sheet", async (req, res) => {
       return res.status(400).json({ error: "Invalid or missing 'dateRange'. Expected a string." });
     }
 
-    if (typeof totalBillableAmount !== 'number' || typeof totalLaborHours !== 'number' || typeof totalBillableHours !== 'number') {
-      return res.status(400).json({ error: "Invalid 'totalBillableAmount', 'totalLaborHours', or 'totalBillableHours'. Expected numbers." });
+    if (
+      typeof totalBillableAmount !== 'number' ||
+      typeof totalLaborHours !== 'number' ||
+      typeof totalBillableHours !== 'number'
+    ) {
+      return res.status(400).json({
+        error: "Invalid 'totalBillableAmount', 'totalLaborHours', or 'totalBillableHours'. Expected numbers.",
+      });
     }
 
     // Define the spreadsheet ID
@@ -432,7 +436,7 @@ app.post("/write-to-sheet", async (req, res) => {
       // Clear the existing "Detailed Report" sheet content except for formatting
       await sheets.spreadsheets.values.clear({
         spreadsheetId,
-        range: "Detailed Report!A9:K", // Clear from row 9 onwards to preserve headers and formatting
+        range: "Detailed Report!A9:J", // Start clearing from row 9
       });
       console.log('"Detailed Report" sheet cleared.');
     }
@@ -452,15 +456,18 @@ app.post("/write-to-sheet", async (req, res) => {
 
     // Prepare final data with date rows and log entries
     const finalData = [];
-
-    // Track row numbers for formatting
-    const dateRows = [];
+    const dateRowIndices = []; // To track which rows are date rows for formatting
     let currentRow = 9; // Starting from row 9
 
     sortedDates.forEach(date => {
       // Format the date as "Mon, 25 Nov, 2024"
       const dateObj = new Date(date);
-      const formattedDate = dateObj.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+      const formattedDate = dateObj.toLocaleDateString(undefined, {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+      });
 
       // Calculate totals for this date
       const billableAmountForDate = groupedData[date].reduce((sum, row) => sum + (parseFloat(row[5]) || 0), 0);
@@ -479,18 +486,17 @@ app.post("/write-to-sheet", async (req, res) => {
         totalHoursForDate, // H
         billableHoursForDate, // I
         "", // J
-        "", // K (Added to match Columns A-K)
       ];
 
       finalData.push(dateRow);
-      dateRows.push(currentRow);
+      dateRowIndices.push(currentRow);
       currentRow++;
 
       // Add log entries under this date
       groupedData[date].forEach(log => {
         // Ensure each log entry has exactly 10 columns (A-J)
         const logEntry = [
-          "", // DATE column is empty for log entries
+          log[0], // DATE
           log[1], // USER
           log[2], // CLIENT
           log[3], // PROJECT
@@ -500,7 +506,7 @@ app.post("/write-to-sheet", async (req, res) => {
           log[7], // START/FINISH TIME
           log[8], // TOTAL HOURS
           log[9], // BILLABLE HOURS
-          log[10], // DESCRIPTION
+          log[10] || "", // DESCRIPTION (if exists)
         ];
         finalData.push(logEntry);
         currentRow++;
@@ -519,15 +525,14 @@ app.post("/write-to-sheet", async (req, res) => {
       totalLaborHours, // H
       totalBillableHours, // I
       "", // J
-      "", // K
     ];
 
     finalData.push(totalRow);
-    const totalRowNumber = currentRow;
+    const totalRowIndex = currentRow;
     currentRow++;
 
     // Write the final data to the sheet starting from row 9
-    const dataRange = `Detailed Report!A9:K${8 + finalData.length}`; // A9:K{lastRow}
+    const dataRange = `Detailed Report!A9:J${8 + finalData.length}`; // A9:J{lastRow}
 
     await sheets.spreadsheets.values.update({
       spreadsheetId,
@@ -541,7 +546,13 @@ app.post("/write-to-sheet", async (req, res) => {
     console.log('Data written successfully.');
 
     // Apply formatting
-    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, dateRows, totalRowNumber);
+    await applyFormatting(
+      sheets,
+      spreadsheetId,
+      detailedReportSheetId,
+      dateRowIndices,
+      8 + finalData.length // Total row index (1-based)
+    );
 
     console.log('Formatting applied successfully.');
 
@@ -671,6 +682,7 @@ app.put("/edit-log", async (req, res) => {
     res.status(500).json({ error: "Error updating the time log." });
   }
 });
+
 
 app.listen(PORT, () => {
   console.log(`Proxy server running on http://localhost:${PORT}`);
