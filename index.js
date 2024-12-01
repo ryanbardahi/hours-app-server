@@ -30,11 +30,36 @@ app.post("/write-to-sheet", async (req, res) => {
   try {
     const { text } = req.body;
 
-    // Define the spreadsheet and range
+    // Define the spreadsheet ID
     const spreadsheetId = process.env.SPREADSHEET_ID;
-    const range = "Detailed Report!A1";
 
-    // Write data to the sheet
+    // Get existing sheets to check if "Detailed Report" exists
+    const sheetMetadata = await sheets.spreadsheets.get({ spreadsheetId });
+    const sheetExists = sheetMetadata.data.sheets.some(
+      (sheet) => sheet.properties.title === "Detailed Report"
+    );
+
+    if (!sheetExists) {
+      // Create the "Detailed Report" sheet if it doesn't exist
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId,
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: "Detailed Report",
+                },
+              },
+            },
+          ],
+        },
+      });
+      console.log('"Detailed Report" sheet created.');
+    }
+
+    // Write data to the "Detailed Report" sheet
+    const range = "Detailed Report!A1";
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range,
@@ -46,10 +71,11 @@ app.post("/write-to-sheet", async (req, res) => {
 
     res.status(200).json({ message: "Data written successfully!" });
   } catch (error) {
-    console.error(error);
+    console.error("Error in /write-to-sheet:", error);
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
+
 
 app.post("/login", async (req, res) => {
   try {
