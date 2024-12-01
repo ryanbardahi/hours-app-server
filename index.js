@@ -2,6 +2,7 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 import dotenv from "dotenv";
+import { google } from "googleapis";
 
 dotenv.config();
 
@@ -16,6 +17,39 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 app.use(express.json());
+
+// Google Sheets Authentication
+const auth = new google.auth.GoogleAuth({
+  keyFile: process.env.GOOGLE_SERVICE_ACCOUNT_KEYFILE,
+  scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+});
+
+const sheets = google.sheets({ version: "v4", auth });
+
+app.post("/write-to-sheet", async (req, res) => {
+  try {
+    const { text } = req.body;
+
+    // Define the spreadsheet and range
+    const spreadsheetId = process.env.SPREADSHEET_ID;
+    const range = "Detailed Report!A1";
+
+    // Write data to the sheet
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range,
+      valueInputOption: "RAW",
+      requestBody: {
+        values: [[text]], // Data to write
+      },
+    });
+
+    res.status(200).json({ message: "Data written successfully!" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to write to Google Sheet" });
+  }
+});
 
 app.post("/login", async (req, res) => {
   try {
