@@ -98,29 +98,6 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
     },
   });
 
-  // 4. Format Cells B2 to B5
-  requests.push({
-    repeatCell: {
-      range: {
-        sheetId: sheetId,
-        startRowIndex: 1,
-        endRowIndex: 5,
-        startColumnIndex: 1,
-        endColumnIndex: 2,
-      },
-      cell: {
-        userEnteredFormat: {
-          textFormat: {
-            fontSize: 12,
-            bold: true,
-            foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
-          },
-        },
-      },
-      fields: 'userEnteredFormat.textFormat',
-    },
-  });
-
   // 5. Set Headers in Row 8
   const headers = [
     'USER', 'CLIENT', 'PROJECT', 'TASK', 'IS BILLABLE',
