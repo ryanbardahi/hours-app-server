@@ -282,6 +282,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
               bold: false,
               foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
             },
+            horizontalAlignment: 'LEFT',
           },
         }],
       }],
