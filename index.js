@@ -284,14 +284,16 @@ app.post("/write-to-sheet", async (req, res) => {
       return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of arrays." });
     }
 
-    // Spreadsheet ID
+    if (!dateRange || typeof dateRange !== "string") {
+      return res.status(400).json({ error: "Invalid or missing 'dateRange'. Expected a string." });
+    }
+
+    // Define the spreadsheet ID
     const spreadsheetId = process.env.SPREADSHEET_ID;
 
-    // Check if the "Detailed Report" sheet exists
+    // Get or create the "Detailed Report" sheet
     const sheetMetadata = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheet = sheetMetadata.data.sheets.find(
-      (sheet) => sheet.properties.title === "Detailed Report"
-    );
+    const sheet = sheetMetadata.data.sheets.find(sheet => sheet.properties.title === "Detailed Report");
 
     let detailedReportSheetId;
     if (!sheet) {
@@ -302,65 +304,93 @@ app.post("/write-to-sheet", async (req, res) => {
       detailedReportSheetId = addSheetResponse.data.replies[0].addSheet.properties.sheetId;
     } else {
       detailedReportSheetId = sheet.properties.sheetId;
-      await sheets.spreadsheets.values.clear({
-        spreadsheetId,
-        range: "Detailed Report!A9:J",
-      });
+      await sheets.spreadsheets.values.clear({ spreadsheetId, range: "Detailed Report!A9:J" });
     }
 
-    // Group data by date
-    const groupedData = data.reduce((acc, row) => {
-      const date = row[0]; // Assume date is in Column A
-      acc[date] = acc[date] || [];
-      acc[date].push(row);
+    // Organize data by date
+    const groupedData = data.reduce((acc, log) => {
+      const logDate = new Date(log.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
+      if (!acc[logDate]) acc[logDate] = [];
+      acc[logDate].push(log);
       return acc;
     }, {});
 
-    const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
-
-    // Prepare rows
     const rows = [];
-    const dateRowIndices = [];
-    let totalBillable = 0; // Ensure declared only once
-    let totalLaborHoursAccumulator = 0; // Renamed to avoid conflict
+    let grandTotalBillable = 0;
+    let grandTotalHours = 0;
+    let grandTotalBillableHours = 0;
 
-    sortedDates.forEach((date) => {
-      const logs = groupedData[date];
-      const billableAmount = logs.reduce((sum, log) => sum + log[5], 0);
-      const laborHours = logs.reduce((sum, log) => sum + log[7], 0);
+    // Prepare rows for each date group
+    Object.entries(groupedData).forEach(([date, logs]) => {
+      const dateTotalBillable = logs.reduce((sum, log) => sum + log.billableAmount, 0);
+      const dateTotalHours = logs.reduce((sum, log) => sum + log.laborHours, 0);
+      const dateTotalBillableHours = logs.reduce((sum, log) => sum + log.billableHours, 0);
 
-      // Add date row
       rows.push([
-        new Date(date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
-        "", "", "", "",
-        billableAmount, "", laborHours, "", ""
+        date, "", "", "", "",
+        dateTotalBillable.toFixed(2), "", dateTotalHours.toFixed(2), dateTotalBillableHours.toFixed(2), "",
       ]);
-      dateRowIndices.push(rows.length - 1);
 
-      // Add log rows
-      rows.push(...logs);
+      logs.forEach(log => {
+        rows.push([
+          log.userName, log.clientName, log.projectName, log.taskName || "N/A",
+          log.billable ? "Billable" : "Not Billable",
+          log.billableAmount.toFixed(2), log.startEndTime || "-", log.laborHours.toFixed(2), log.billableHours.toFixed(2),
+          log.note || "N/A",
+        ]);
+      });
 
-      // Accumulate totals
-      totalBillable += billableAmount;
-      totalLaborHoursAccumulator += laborHours;
+      grandTotalBillable += dateTotalBillable;
+      grandTotalHours += dateTotalHours;
+      grandTotalBillableHours += dateTotalBillableHours;
     });
 
-    // Add total row
+    // Add the total row at the end
     rows.push([
       "TOTAL", "", "", "", "",
-      totalBillable, "", totalLaborHoursAccumulator, "", ""
+      grandTotalBillable.toFixed(2), "", grandTotalHours.toFixed(2), grandTotalBillableHours.toFixed(2), "",
     ]);
 
     // Write data to sheet
+    const dataRange = `Detailed Report!A9:J${8 + rows.length}`;
     await sheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `Detailed Report!A9:J${8 + rows.length}`,
+      range: dataRange,
       valueInputOption: "RAW",
       requestBody: { values: rows },
     });
 
     // Apply formatting
-    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, dateRowIndices, rows.length);
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          // Set date rows' background color and bold text
+          {
+            repeatCell: {
+              range: { sheetId: detailedReportSheetId, startRowIndex: 8, endRowIndex: 8 + rows.length, startColumnIndex: 0, endColumnIndex: 10 },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 220 / 255, green: 238 / 255, blue: 250 / 255 },
+                  textFormat: { bold: true },
+                },
+              },
+              fields: "userEnteredFormat(backgroundColor,textFormat)",
+            },
+          },
+          // Format currency columns
+          {
+            repeatCell: {
+              range: { sheetId: detailedReportSheetId, startRowIndex: 8, endRowIndex: 8 + rows.length, startColumnIndex: 5, endColumnIndex: 6 },
+              cell: {
+                userEnteredFormat: { numberFormat: { type: "CURRENCY", pattern: "GBP#,##0.00" } },
+              },
+              fields: "userEnteredFormat.numberFormat",
+            },
+          },
+        ],
+      },
+    });
 
     res.status(200).json({ message: "Detailed Report created and data written successfully!" });
   } catch (error) {
@@ -368,6 +398,7 @@ app.post("/write-to-sheet", async (req, res) => {
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
+
 
 
 
