@@ -26,8 +26,7 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: "v4", auth });
 
-// Helper function to apply formatting
-const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
+const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, totalRowIndex) => {
   const requests = [];
 
   // 1. Format Column A as Text
@@ -41,71 +40,76 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
       cell: {
         userEnteredFormat: {
           numberFormat: {
-            type: 'TEXT',
+            type: "TEXT",
           },
         },
       },
-      fields: 'userEnteredFormat.numberFormat',
+      fields: "userEnteredFormat.numberFormat",
     },
   });
 
   // 2. Format Cell A1
   requests.push({
     updateCells: {
-      rows: [{
-        values: [{
-          userEnteredValue: { stringValue: 'DETAILED REPORT' },
-          userEnteredFormat: {
-            textFormat: {
-              fontSize: 22,
-              bold: true,
-              foregroundColor: { red: 59/255, green: 143/255, blue: 194/255 }, // #3B8FC2
+      rows: [
+        {
+          values: [
+            {
+              userEnteredValue: { stringValue: "DETAILED REPORT" },
+              userEnteredFormat: {
+                textFormat: {
+                  fontSize: 22,
+                  bold: true,
+                  foregroundColor: { red: 59 / 255, green: 143 / 255, blue: 194 / 255 }, // #3B8FC2
+                },
+              },
             },
-          },
-        }],
-      }],
-      fields: 'userEnteredValue,userEnteredFormat.textFormat',
+          ],
+        },
+      ],
+      fields: "userEnteredValue,userEnteredFormat.textFormat",
       start: { sheetId: sheetId, rowIndex: 0, columnIndex: 0 },
     },
   });
 
-  // 3. Format Cells A2 to A5
+  // 3. Format Cells A2 to A5 (Static labels)
   const labels = [
-    'Time frame',
-    'Billable amount (hours)',
-    'Total billable amount',
-    'Total hours',
+    "Time frame",
+    "Billable amount (hours)",
+    "Total billable amount",
+    "Total hours",
   ];
 
-  const formattedRows = labels.map((label, index) => ({
-    values: [{
-      userEnteredValue: { stringValue: label },
-      userEnteredFormat: {
-        textFormat: {
-          fontSize: 10,
-          bold: false,
-          // Default font color (black)
+  const formattedRows = labels.map((label) => ({
+    values: [
+      {
+        userEnteredValue: { stringValue: label },
+        userEnteredFormat: {
+          textFormat: {
+            fontSize: 10,
+            bold: false,
+          },
         },
       },
-    }],
+    ],
   }));
 
   requests.push({
     updateCells: {
       rows: formattedRows,
-      fields: 'userEnteredValue,userEnteredFormat.textFormat',
-      start: { sheetId: sheetId, rowIndex: 1, columnIndex: 0 }, // A2 starts at rowIndex 1
+      fields: "userEnteredValue,userEnteredFormat.textFormat",
+      start: { sheetId: sheetId, rowIndex: 1, columnIndex: 0 },
     },
   });
 
-  // 5. Set Headers in Row 8
+  // 4. Set Headers in Row 8
   const headers = [
-    'USER', 'CLIENT', 'PROJECT', 'TASK', 'IS BILLABLE',
-    'BILLABLE AMOUNT', 'START/FINISH TIME', 'TOTAL HOURS',
-    'BILLABLE HOURS', 'DESCRIPTION'
+    "USER", "CLIENT", "PROJECT", "TASK", "IS BILLABLE",
+    "BILLABLE AMOUNT", "START/FINISH TIME", "TOTAL HOURS",
+    "BILLABLE HOURS", "DESCRIPTION",
   ];
 
-  const headerValues = headers.map(header => ({
+  const headerValues = headers.map((header) => ({
     userEnteredValue: { stringValue: header },
     userEnteredFormat: {
       textFormat: {
@@ -117,28 +121,73 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
 
   requests.push({
     updateCells: {
-      rows: [{
-        values: headerValues,
-      }],
-      fields: 'userEnteredValue,userEnteredFormat.textFormat',
-      start: { sheetId: sheetId, rowIndex: 7, columnIndex: 0 }, // Row 8
+      rows: [
+        {
+          values: headerValues,
+        },
+      ],
+      fields: "userEnteredValue,userEnteredFormat.textFormat",
+      start: { sheetId: sheetId, rowIndex: 7, columnIndex: 0 },
     },
   });
 
-  // 6. Set Column Widths
+  // 5. Format Date Rows
+  dateRowIndices.forEach((index) => {
+    requests.push({
+      repeatCell: {
+        range: {
+          sheetId: sheetId,
+          startRowIndex: index,
+          endRowIndex: index + 1,
+          startColumnIndex: 0,
+          endColumnIndex: 10,
+        },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: { red: 0.86, green: 0.93, blue: 0.98 }, // #dceefa
+            textFormat: { bold: true },
+          },
+        },
+        fields: "userEnteredFormat(backgroundColor,textFormat)",
+      },
+    });
+  });
+
+  // 6. Format Total Row
+  requests.push({
+    repeatCell: {
+      range: {
+        sheetId: sheetId,
+        startRowIndex: totalRowIndex - 1,
+        endRowIndex: totalRowIndex,
+        startColumnIndex: 0,
+        endColumnIndex: 10,
+      },
+      cell: {
+        userEnteredFormat: {
+          textFormat: {
+            bold: true,
+            fontSize: 12,
+          },
+        },
+      },
+    },
+  });
+
+  // 7. Set Column Widths
   // Column A
   requests.push({
     updateDimensionProperties: {
       range: {
         sheetId: sheetId,
-        dimension: 'COLUMNS',
+        dimension: "COLUMNS",
         startIndex: 0,
         endIndex: 1,
       },
       properties: {
         pixelSize: 280,
       },
-      fields: 'pixelSize',
+      fields: "pixelSize",
     },
   });
 
@@ -148,14 +197,14 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
       updateDimensionProperties: {
         range: {
           sheetId: sheetId,
-          dimension: 'COLUMNS',
+          dimension: "COLUMNS",
           startIndex: col,
           endIndex: col + 1,
         },
         properties: {
           pixelSize: 150,
         },
-        fields: 'pixelSize',
+        fields: "pixelSize",
       },
     });
   }
@@ -165,118 +214,67 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
     updateDimensionProperties: {
       range: {
         sheetId: sheetId,
-        dimension: 'COLUMNS',
+        dimension: "COLUMNS",
         startIndex: 9,
         endIndex: 10,
       },
       properties: {
         pixelSize: 500,
       },
-      fields: 'pixelSize',
+      fields: "pixelSize",
     },
   });
 
-  // 7. Wrap Text for All Columns
+  // 8. Wrap Text for All Columns
   requests.push({
     repeatCell: {
       range: {
         sheetId: sheetId,
         startRowIndex: 0,
-        endRowIndex: 1000, // Adjust as needed
+        endRowIndex: 1000,
         startColumnIndex: 0,
         endColumnIndex: 10,
       },
       cell: {
         userEnteredFormat: {
-          wrapStrategy: 'WRAP',
+          wrapStrategy: "WRAP",
         },
       },
-      fields: 'userEnteredFormat.wrapStrategy',
+      fields: "userEnteredFormat.wrapStrategy",
     },
   });
 
-  // 8. Write Date Range to B2
+  // 9. Apply Currency Format to Column F (Billable Amount)
   requests.push({
-    updateCells: {
-      rows: [{
-        values: [{
-          userEnteredValue: { stringValue: data.dateRange },
-          userEnteredFormat: {
-            textFormat: {
-              fontSize: 12,
-              bold: true,
-              foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
-            },
+    repeatCell: {
+      range: {
+        sheetId: sheetId,
+        startRowIndex: 8,
+        endRowIndex: 1000, // Adjust as needed
+        startColumnIndex: 5,
+        endColumnIndex: 6,
+      },
+      cell: {
+        userEnteredFormat: {
+          numberFormat: {
+            type: "CURRENCY",
+            pattern: "GBP#,##0.00",
           },
-        }],
-      }],
-      fields: 'userEnteredValue,userEnteredFormat.textFormat',
-      start: { sheetId: sheetId, rowIndex: 1, columnIndex: 1 }, // B2
+        },
+      },
+      fields: "userEnteredFormat.numberFormat",
     },
   });
 
-  // 9. Write Total Billable Amount to B3 and B4
-  const formattedTotalBillable = `£${data.totalBillableAmount.toFixed(2)}`;
-
-  for (let row = 2; row <= 3; row++) { // B3 and B4
-    requests.push({
-      updateCells: {
-        rows: [{
-          values: [{
-            userEnteredValue: { stringValue: formattedTotalBillable },
-            userEnteredFormat: {
-              numberFormat: {
-                type: 'CURRENCY',
-                pattern: '£#,##0.00',
-              },
-              textFormat: {
-                fontSize: 12,
-                bold: true,
-                foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
-              },
-            },
-          }],
-        }],
-        fields: 'userEnteredValue,userEnteredFormat.numberFormat,userEnteredFormat.textFormat',
-        start: { sheetId: sheetId, rowIndex: row, columnIndex: 1 }, // B3 and B4
-      },
-    });
-  }
-
-  // 10. Write Total Labor Hours to B5
-  requests.push({
-      updateCells: {
-        rows: [{
-          values: [{
-            userEnteredValue: { numberValue: data.totalLaborHours },
-            userEnteredFormat: {
-              numberFormat: {
-                type: 'NUMBER',
-                pattern: '0.00',
-              },
-              textFormat: {
-                fontSize: 12,
-                bold: true,
-                foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
-              },
-              horizontalAlignment: 'LEFT',
-            },
-          }],
-        }],
-        fields: 'userEnteredValue,userEnteredFormat.numberFormat,userEnteredFormat.textFormat,userEnteredFormat.horizontalAlignment',
-        start: { sheetId: sheetId, rowIndex: 4, columnIndex: 1 }, // B5
-      },
-  });
-
-
-  // Execute all requests
+  // Execute all formatting requests
   await sheets.spreadsheets.batchUpdate({
-    spreadsheetId: spreadsheetId,
+    spreadsheetId,
     requestBody: {
       requests: requests,
     },
   });
 };
+
 
 app.post("/write-to-sheet", async (req, res) => {
   try {
@@ -286,18 +284,10 @@ app.post("/write-to-sheet", async (req, res) => {
       return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of arrays." });
     }
 
-    if (!dateRange || typeof dateRange !== 'string') {
-      return res.status(400).json({ error: "Invalid or missing 'dateRange'. Expected a string." });
-    }
-
-    if (typeof totalBillableAmount !== 'number' || typeof totalLaborHours !== 'number') {
-      return res.status(400).json({ error: "Invalid 'totalBillableAmount' or 'totalLaborHours'. Expected numbers." });
-    }
-
-    // Define the spreadsheet ID
+    // Spreadsheet ID
     const spreadsheetId = process.env.SPREADSHEET_ID;
 
-    // Get existing sheets to check if "Detailed Report" exists
+    // Check if the "Detailed Report" sheet exists
     const sheetMetadata = await sheets.spreadsheets.get({ spreadsheetId });
     const sheet = sheetMetadata.data.sheets.find(
       (sheet) => sheet.properties.title === "Detailed Report"
@@ -305,52 +295,72 @@ app.post("/write-to-sheet", async (req, res) => {
 
     let detailedReportSheetId;
     if (!sheet) {
-      // Create the "Detailed Report" sheet if it doesn't exist
       const addSheetResponse = await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
-        requestBody: {
-          requests: [
-            {
-              addSheet: {
-                properties: {
-                  title: "Detailed Report",
-                },
-              },
-            },
-          ],
-        },
+        requestBody: { requests: [{ addSheet: { properties: { title: "Detailed Report" } } }] },
       });
       detailedReportSheetId = addSheetResponse.data.replies[0].addSheet.properties.sheetId;
-      console.log('"Detailed Report" sheet created.');
     } else {
       detailedReportSheetId = sheet.properties.sheetId;
-      // Clear the existing "Detailed Report" sheet content except for formatting (optional)
       await sheets.spreadsheets.values.clear({
         spreadsheetId,
-        range: "Detailed Report!A2:J", // Adjust range as needed to preserve formatting
+        range: "Detailed Report!A9:J",
       });
-      console.log('"Detailed Report" sheet cleared.');
     }
 
-    // Apply formatting and write date range and totals
-    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, { dateRange, totalBillableAmount, totalLaborHours });
+    // Group data by date
+    const groupedData = data.reduce((acc, row) => {
+      const date = row[0]; // Assume date is in Column A
+      acc[date] = acc[date] || [];
+      acc[date].push(row);
+      return acc;
+    }, {});
 
-    console.log('Formatting applied successfully.');
+    const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a) - new Date(b));
 
-    // 11. Write Data to the Sheet
-    // Assuming data starts from row 9
-    const dataRange = `Detailed Report!A9:J${8 + data.length}`;
+    // Prepare rows
+    const rows = [];
+    const dateRowIndices = [];
+    let totalBillable = 0;
+    let totalLaborHours = 0;
 
-    await sheets.spreadsheets.values.update({
-      spreadsheetId,
-      range: dataRange,
-      valueInputOption: 'RAW',
-      requestBody: {
-        values: data,
-      },
+    sortedDates.forEach((date, idx) => {
+      const logs = groupedData[date];
+      const billableAmount = logs.reduce((sum, log) => sum + log[5], 0);
+      const laborHours = logs.reduce((sum, log) => sum + log[7], 0);
+
+      // Add date row
+      rows.push([
+        new Date(date).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+        "", "", "", "",
+        billableAmount, "", laborHours, "", ""
+      ]);
+      dateRowIndices.push(rows.length - 1);
+
+      // Add log rows
+      rows.push(...logs);
+
+      // Accumulate totals
+      totalBillable += billableAmount;
+      totalLaborHours += laborHours;
     });
 
-    console.log('Data written successfully.');
+    // Add total row
+    rows.push([
+      "TOTAL", "", "", "", "",
+      totalBillable, "", totalLaborHours, "", ""
+    ]);
+
+    // Write data to sheet
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `Detailed Report!A9:J${8 + rows.length}`,
+      valueInputOption: "RAW",
+      requestBody: { values: rows },
+    });
+
+    // Apply formatting
+    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, dateRowIndices, rows.length);
 
     res.status(200).json({ message: "Detailed Report created and data written successfully!" });
   } catch (error) {
@@ -358,6 +368,7 @@ app.post("/write-to-sheet", async (req, res) => {
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
+
 
 app.post("/login", async (req, res) => {
   try {
