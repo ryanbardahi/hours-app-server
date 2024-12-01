@@ -248,93 +248,144 @@ app.post("/write-to-sheet", async (req, res) => {
     const { data, dateRange, totalBillableAmount, totalLaborHours } = req.body;
 
     if (!data || !Array.isArray(data)) {
-      return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of objects." });
+      return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of arrays." });
     }
 
-    if (!dateRange || typeof dateRange !== "string") {
+    if (!dateRange || typeof dateRange !== 'string') {
       return res.status(400).json({ error: "Invalid or missing 'dateRange'. Expected a string." });
+    }
+
+    if (typeof totalBillableAmount !== 'number' || typeof totalLaborHours !== 'number') {
+      return res.status(400).json({ error: "Invalid 'totalBillableAmount' or 'totalLaborHours'. Expected numbers." });
     }
 
     // Define the spreadsheet ID
     const spreadsheetId = process.env.SPREADSHEET_ID;
 
-    // Get or create the "Detailed Report" sheet
+    // Get existing sheets to check if "Detailed Report" exists
     const sheetMetadata = await sheets.spreadsheets.get({ spreadsheetId });
-    const sheet = sheetMetadata.data.sheets.find(sheet => sheet.properties.title === "Detailed Report");
+    const sheet = sheetMetadata.data.sheets.find(
+      (sheet) => sheet.properties.title === "Detailed Report"
+    );
 
     let detailedReportSheetId;
     if (!sheet) {
+      // Create the "Detailed Report" sheet if it doesn't exist
       const addSheetResponse = await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
-        requestBody: { requests: [{ addSheet: { properties: { title: "Detailed Report" } } }] },
+        requestBody: {
+          requests: [
+            {
+              addSheet: {
+                properties: {
+                  title: "Detailed Report",
+                },
+              },
+            },
+          ],
+        },
       });
       detailedReportSheetId = addSheetResponse.data.replies[0].addSheet.properties.sheetId;
+      console.log('"Detailed Report" sheet created.');
     } else {
       detailedReportSheetId = sheet.properties.sheetId;
-      await sheets.spreadsheets.values.clear({ spreadsheetId, range: "Detailed Report!A9:J" });
+      // Clear the existing "Detailed Report" sheet content except for formatting
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: "Detailed Report!A9:J", // Adjust range as needed to preserve formatting
+      });
+      console.log('"Detailed Report" sheet cleared.');
     }
 
-    // Organize data by date
-    const groupedData = data.reduce((acc, log) => {
-      const logDate = new Date(log.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
-      if (!acc[logDate]) acc[logDate] = [];
-      acc[logDate].push(log);
-      return acc;
-    }, {});
+    // Process data to include date rows
+    const processedData = [];
+    let currentDate = null;
+    let totalBillable = 0;
+    let totalHours = 0;
+    let totalBillableHours = 0;
 
-    const rows = [];
-    let grandTotalBillable = 0;
-    let grandTotalHours = 0;
-    let grandTotalBillableHours = 0;
+    // Sort data by date to ensure grouping
+    data.sort((a, b) => new Date(a[0]) - new Date(b[0]));
 
-    // Prepare rows for each date group
-    Object.entries(groupedData).forEach(([date, logs]) => {
-      const dateTotalBillable = logs.reduce((sum, log) => sum + (log.billableAmount || 0), 0);
-      const dateTotalHours = logs.reduce((sum, log) => sum + (log.laborHours || 0), 0);
-      const dateTotalBillableHours = logs.reduce((sum, log) => sum + (log.billableHours || 0), 0);
-
-      rows.push([
-        date, "", "", "", "",
-        dateTotalBillable.toFixed(2), "", dateTotalHours.toFixed(2), dateTotalBillableHours.toFixed(2), "",
-      ]);
-
-      logs.forEach(log => {
-        rows.push([
-          log.userName || "N/A",
-          log.clientName || "N/A",
-          log.projectName || "N/A",
-          log.taskName || "N/A",
-          log.billable ? "Billable" : "Not Billable",
-          (log.billableAmount || 0).toFixed(2),
-          log.startEndTime || "-",
-          (log.laborHours || 0).toFixed(2),
-          (log.billableHours || 0).toFixed(2),
-          log.note || "N/A",
+    data.forEach((log) => {
+      const logDate = log[0]; // Assuming the first element is the date in 'YYYY-MM-DD' format
+      if (logDate !== currentDate) {
+        currentDate = logDate;
+        const formattedDate = new Date(logDate).toLocaleDateString(undefined, {
+          weekday: 'short',
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+        // Insert Date Row
+        processedData.push([
+          formattedDate, // Column A
+          '', // B
+          '', // C
+          '', // D
+          '', // E
+          0,  // F (Billable Amount for the date)
+          '', // G
+          0,  // H (Total Hours for the date)
+          0,  // I (Billable Hours for the date)
+          '', // J
         ]);
-      });
+      }
 
-      grandTotalBillable += dateTotalBillable;
-      grandTotalHours += dateTotalHours;
-      grandTotalBillableHours += dateTotalBillableHours;
+      // Add log entry
+      processedData.push(log);
+
+      // Accumulate totals
+      totalBillable += log[5];
+      totalHours += parseFloat(log[7]);
+      totalBillableHours += parseFloat(log[8]);
+
+      // Update the latest date row with accumulated values
+      // Assuming the date row is always two rows above the current log
+      const dateRowIndex = processedData.length - 2;
+      processedData[dateRowIndex][5] += log[5]; // Column F
+      processedData[dateRowIndex][7] += parseFloat(log[7]); // Column H
+      processedData[dateRowIndex][8] += parseFloat(log[8]); // Column I
     });
 
-    // Add the total row at the end
-    rows.push([
-      "TOTAL", "", "", "", "",
-      grandTotalBillable.toFixed(2), "", grandTotalHours.toFixed(2), grandTotalBillableHours.toFixed(2), "",
+    // Append Total Row
+    processedData.push([
+      'TOTAL', // Column A
+      '', // B
+      '', // C
+      '', // D
+      '', // E
+      totalBillable, // F
+      '', // G
+      totalHours, // H
+      totalBillableHours, // I
+      '', // J
     ]);
 
-    // Write data to sheet
-    const dataRange = `Detailed Report!A9:J${8 + rows.length}`;
+    // Apply formatting and write date range and totals
+    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, { dateRange, totalBillableAmount, totalLaborHours });
+
+    console.log('Formatting applied successfully.');
+
+    // 11. Write Processed Data to the Sheet
+    // Calculate the range based on processedData length
+    const startRow = 9; // Starting from row 9
+    const endRow = startRow + processedData.length - 1;
+    const dataRange = `Detailed Report!A${startRow}:J${endRow}`;
+
     await sheets.spreadsheets.values.update({
       spreadsheetId,
       range: dataRange,
-      valueInputOption: "RAW",
-      requestBody: { values: rows },
+      valueInputOption: 'RAW',
+      requestBody: {
+        values: processedData,
+      },
     });
 
-    // Apply formatting
-    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, Object.keys(groupedData).map((_, i) => 8 + i), rows.length + 8);
+    console.log('Data written successfully.');
+
+    // Apply additional formatting for date rows and total row
+    await applyAdditionalFormatting(sheets, spreadsheetId, detailedReportSheetId, startRow, processedData.length);
 
     res.status(200).json({ message: "Detailed Report created and data written successfully!" });
   } catch (error) {
@@ -342,9 +393,6 @@ app.post("/write-to-sheet", async (req, res) => {
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
-
-
-
 
 app.post("/login", async (req, res) => {
   try {
