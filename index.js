@@ -245,28 +245,29 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, data) => {
 
   // 10. Write Total Labor Hours to B5
   requests.push({
-    updateCells: {
-      rows: [{
-        values: [{
-          userEnteredValue: { numberValue: data.totalLaborHours },
-          userEnteredFormat: {
-            numberFormat: {
-              type: 'NUMBER',
-              pattern: '0.00',
+      updateCells: {
+        rows: [{
+          values: [{
+            userEnteredValue: { numberValue: data.totalLaborHours },
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'NUMBER',
+                pattern: '0.00',
+              },
+              textFormat: {
+                fontSize: 12,
+                bold: true,
+                foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
+              },
+              horizontalAlignment: 'LEFT',
             },
-            textFormat: {
-              fontSize: 12,
-              bold: true,
-              foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 }, // #375D75
-            },
-            horizontalAlignment: 'LEFT',
-          },
+          }],
         }],
-      }],
-      fields: 'userEnteredValue,userEnteredFormat.numberFormat,userEnteredFormat.textFormat',
-      start: { sheetId: sheetId, rowIndex: 4, columnIndex: 1 }, // B5
-    },
+        fields: 'userEnteredValue,userEnteredFormat.numberFormat,userEnteredFormat.textFormat,userEnteredFormat.horizontalAlignment',
+        start: { sheetId: sheetId, rowIndex: 4, columnIndex: 1 }, // B5
+      },
   });
+
 
   // Execute all requests
   await sheets.spreadsheets.batchUpdate({
