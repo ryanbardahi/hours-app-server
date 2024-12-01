@@ -48,7 +48,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
     },
   });
 
-  // 2. Format Cell A1
+  // 2. Format Header Cell (A1)
   requests.push({
     updateCells: {
       rows: [
@@ -72,7 +72,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
     },
   });
 
-  // 3. Format Cells A2 to A5 (Static labels)
+  // 3. Format Static Labels (A2-A5)
   const labels = [
     "Time frame",
     "Billable amount (hours)",
@@ -80,7 +80,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
     "Total hours",
   ];
 
-  const formattedRows = labels.map((label) => ({
+  const formattedRows = labels.map(label => ({
     values: [
       {
         userEnteredValue: { stringValue: label },
@@ -102,14 +102,14 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
     },
   });
 
-  // 4. Set Headers in Row 8
+  // 4. Format Headers in Row 8
   const headers = [
     "USER", "CLIENT", "PROJECT", "TASK", "IS BILLABLE",
     "BILLABLE AMOUNT", "START/FINISH TIME", "TOTAL HOURS",
     "BILLABLE HOURS", "DESCRIPTION",
   ];
 
-  const headerValues = headers.map((header) => ({
+  const headerValues = headers.map(header => ({
     userEnteredValue: { stringValue: header },
     userEnteredFormat: {
       textFormat: {
@@ -121,18 +121,14 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
 
   requests.push({
     updateCells: {
-      rows: [
-        {
-          values: headerValues,
-        },
-      ],
+      rows: [{ values: headerValues }],
       fields: "userEnteredValue,userEnteredFormat.textFormat",
       start: { sheetId: sheetId, rowIndex: 7, columnIndex: 0 },
     },
   });
 
   // 5. Format Date Rows
-  dateRowIndices.forEach((index) => {
+  dateRowIndices.forEach(index => {
     requests.push({
       repeatCell: {
         range: {
@@ -148,7 +144,7 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
             textFormat: { bold: true },
           },
         },
-        fields: "userEnteredFormat(backgroundColor,textFormat)",
+        fields: "userEnteredFormat.backgroundColor,userEnteredFormat.textFormat",
       },
     });
   });
@@ -171,58 +167,30 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
           },
         },
       },
+      fields: "userEnteredFormat.textFormat",
     },
   });
 
   // 7. Set Column Widths
-  // Column A
-  requests.push({
-    updateDimensionProperties: {
-      range: {
-        sheetId: sheetId,
-        dimension: "COLUMNS",
-        startIndex: 0,
-        endIndex: 1,
-      },
-      properties: {
-        pixelSize: 280,
-      },
-      fields: "pixelSize",
-    },
-  });
+  const columnWidths = [
+    { index: 0, width: 280 }, // Column A
+    { index: 9, width: 500 }, // Column J
+  ];
+  columnWidths.push(...Array.from({ length: 8 }, (_, i) => ({ index: i + 1, width: 150 }))); // Columns B-I
 
-  // Columns B to I
-  for (let col = 1; col <= 8; col++) {
+  columnWidths.forEach(({ index, width }) => {
     requests.push({
       updateDimensionProperties: {
         range: {
           sheetId: sheetId,
           dimension: "COLUMNS",
-          startIndex: col,
-          endIndex: col + 1,
+          startIndex: index,
+          endIndex: index + 1,
         },
-        properties: {
-          pixelSize: 150,
-        },
+        properties: { pixelSize: width },
         fields: "pixelSize",
       },
     });
-  }
-
-  // Column J
-  requests.push({
-    updateDimensionProperties: {
-      range: {
-        sheetId: sheetId,
-        dimension: "COLUMNS",
-        startIndex: 9,
-        endIndex: 10,
-      },
-      properties: {
-        pixelSize: 500,
-      },
-      fields: "pixelSize",
-    },
   });
 
   // 8. Wrap Text for All Columns
@@ -244,13 +212,13 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
     },
   });
 
-  // 9. Apply Currency Format to Column F (Billable Amount)
+  // 9. Apply Currency Format to Column F
   requests.push({
     repeatCell: {
       range: {
         sheetId: sheetId,
         startRowIndex: 8,
-        endRowIndex: 1000, // Adjust as needed
+        endRowIndex: 1000, // Adjust based on your dataset size
         startColumnIndex: 5,
         endColumnIndex: 6,
       },
@@ -266,14 +234,13 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
     },
   });
 
-  // Execute all formatting requests
+  // Execute the batch update
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId,
-    requestBody: {
-      requests: requests,
-    },
+    requestBody: { requests },
   });
 };
+
 
 
 app.post("/write-to-sheet", async (req, res) => {
