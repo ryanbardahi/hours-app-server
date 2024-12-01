@@ -56,6 +56,14 @@ app.post("/write-to-sheet", async (req, res) => {
         },
       });
       console.log('"Detailed Report" sheet created.');
+    } else {
+      // Clear the existing "Detailed Report" sheet content
+      const rangeToClear = "Detailed Report";
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId,
+        range: rangeToClear,
+      });
+      console.log('"Detailed Report" sheet cleared.');
     }
 
     // Write data to the "Detailed Report" sheet
@@ -75,6 +83,7 @@ app.post("/write-to-sheet", async (req, res) => {
     res.status(500).json({ error: "Failed to write to Google Sheet" });
   }
 });
+
 
 
 app.post("/login", async (req, res) => {
