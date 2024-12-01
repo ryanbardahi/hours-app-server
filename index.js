@@ -281,7 +281,7 @@ app.post("/write-to-sheet", async (req, res) => {
     const { data, dateRange, totalBillableAmount, totalLaborHours } = req.body;
 
     if (!data || !Array.isArray(data)) {
-      return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of arrays." });
+      return res.status(400).json({ error: "Invalid data format. Expected 'data' to be an array of objects." });
     }
 
     if (!dateRange || typeof dateRange !== "string") {
@@ -322,9 +322,9 @@ app.post("/write-to-sheet", async (req, res) => {
 
     // Prepare rows for each date group
     Object.entries(groupedData).forEach(([date, logs]) => {
-      const dateTotalBillable = logs.reduce((sum, log) => sum + log.billableAmount, 0);
-      const dateTotalHours = logs.reduce((sum, log) => sum + log.laborHours, 0);
-      const dateTotalBillableHours = logs.reduce((sum, log) => sum + log.billableHours, 0);
+      const dateTotalBillable = logs.reduce((sum, log) => sum + (log.billableAmount || 0), 0);
+      const dateTotalHours = logs.reduce((sum, log) => sum + (log.laborHours || 0), 0);
+      const dateTotalBillableHours = logs.reduce((sum, log) => sum + (log.billableHours || 0), 0);
 
       rows.push([
         date, "", "", "", "",
@@ -333,9 +333,15 @@ app.post("/write-to-sheet", async (req, res) => {
 
       logs.forEach(log => {
         rows.push([
-          log.userName, log.clientName, log.projectName, log.taskName || "N/A",
+          log.userName || "N/A",
+          log.clientName || "N/A",
+          log.projectName || "N/A",
+          log.taskName || "N/A",
           log.billable ? "Billable" : "Not Billable",
-          log.billableAmount.toFixed(2), log.startEndTime || "-", log.laborHours.toFixed(2), log.billableHours.toFixed(2),
+          (log.billableAmount || 0).toFixed(2),
+          log.startEndTime || "-",
+          (log.laborHours || 0).toFixed(2),
+          (log.billableHours || 0).toFixed(2),
           log.note || "N/A",
         ]);
       });
@@ -361,36 +367,7 @@ app.post("/write-to-sheet", async (req, res) => {
     });
 
     // Apply formatting
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId,
-      requestBody: {
-        requests: [
-          // Set date rows' background color and bold text
-          {
-            repeatCell: {
-              range: { sheetId: detailedReportSheetId, startRowIndex: 8, endRowIndex: 8 + rows.length, startColumnIndex: 0, endColumnIndex: 10 },
-              cell: {
-                userEnteredFormat: {
-                  backgroundColor: { red: 220 / 255, green: 238 / 255, blue: 250 / 255 },
-                  textFormat: { bold: true },
-                },
-              },
-              fields: "userEnteredFormat(backgroundColor,textFormat)",
-            },
-          },
-          // Format currency columns
-          {
-            repeatCell: {
-              range: { sheetId: detailedReportSheetId, startRowIndex: 8, endRowIndex: 8 + rows.length, startColumnIndex: 5, endColumnIndex: 6 },
-              cell: {
-                userEnteredFormat: { numberFormat: { type: "CURRENCY", pattern: "GBP#,##0.00" } },
-              },
-              fields: "userEnteredFormat.numberFormat",
-            },
-          },
-        ],
-      },
-    });
+    await applyFormatting(sheets, spreadsheetId, detailedReportSheetId, Object.keys(groupedData).map((_, i) => 8 + i), rows.length + 8);
 
     res.status(200).json({ message: "Detailed Report created and data written successfully!" });
   } catch (error) {
