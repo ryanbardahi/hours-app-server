@@ -20,7 +20,7 @@ app.use(express.json());
 
 // Google Sheets Authentication
 const auth = new google.auth.GoogleAuth({
-  keyFile: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEYFILE),
+  credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEYFILE),
   scopes: ["https://www.googleapis.com/auth/spreadsheets"],
 });
 
