@@ -100,7 +100,6 @@ app.post("/write-to-sheet", async (req, res) => {
               userEnteredValue: { stringValue: 'DETAILED REPORT' },
               userEnteredFormat: {
                 textFormat: {
-                  fontFamily: 'Calibri',
                   fontSize: 22,
                   bold: true,
                   foregroundColor: { red: 59/255, green: 143/255, blue: 194/255 },
@@ -116,10 +115,10 @@ app.post("/write-to-sheet", async (req, res) => {
       {
         updateCells: {
           rows: [
-            { values: [{ userEnteredValue: { stringValue: 'Time frame' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
-            { values: [{ userEnteredValue: { stringValue: 'Billable amount (hours)' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
-            { values: [{ userEnteredValue: { stringValue: 'Total billable amount' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
-            { values: [{ userEnteredValue: { stringValue: 'Total hours' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Time frame' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Billable amount (hours)' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Total billable amount' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } }] },
+            { values: [{ userEnteredValue: { stringValue: 'Total hours' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } }] },
           ],
           fields: 'userEnteredValue,userEnteredFormat.textFormat',
           start: { sheetId: detailedReportSheetId, rowIndex: 1, columnIndex: 0 },
@@ -138,7 +137,6 @@ app.post("/write-to-sheet", async (req, res) => {
           cell: {
             userEnteredFormat: {
               textFormat: {
-                fontFamily: 'Calibri',
                 fontSize: 12,
                 bold: false,
                 foregroundColor: { red: 55/255, green: 93/255, blue: 117/255 },
@@ -153,16 +151,16 @@ app.post("/write-to-sheet", async (req, res) => {
         updateCells: {
           rows: [{
             values: [
-              { userEnteredValue: { stringValue: 'USER' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'CLIENT' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'PROJECT' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'TASK' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'IS BILLABLE' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'BILLABLE AMOUNT' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'START/FINISH TIME' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'TOTAL HOURS' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'BILLABLE HOURS' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
-              { userEnteredValue: { stringValue: 'DESCRIPTION' }, userEnteredFormat: { textFormat: { fontFamily: 'Calibri', fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'USER' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'CLIENT' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'PROJECT' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'TASK' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'IS BILLABLE' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'BILLABLE AMOUNT' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'START/FINISH TIME' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'TOTAL HOURS' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'BILLABLE HOURS' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
+              { userEnteredValue: { stringValue: 'DESCRIPTION' }, userEnteredFormat: { textFormat: { fontSize: 10, bold: false } } },
             ],
           }],
           fields: 'userEnteredValue,userEnteredFormat.textFormat',
