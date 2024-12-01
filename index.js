@@ -236,12 +236,243 @@ const applyFormatting = async (sheets, spreadsheetId, sheetId, dateRowIndices, t
 
   // Execute the batch update
   await sheets.spreadsheets.batchUpdate({
-    spreadsheetId,
-    requestBody: { requests },
+      spreadsheetId: spreadsheetId,
+      requestBody: {
+        requests: requests,
+    },
   });
+  // Apply additional formatting for date rows and total row
+  await applyAdditionalFormatting(sheets, spreadsheetId, sheetId, 9, data.length);
 };
 
+const applyAdditionalFormatting = async (sheets, spreadsheetId, sheetId, startRow, dataLength) => {
+  const requests = [];
 
+  // Iterate through each row to identify date rows and the total row
+  for (let i = 0; i < dataLength; i++) {
+    const currentRow = startRow + i;
+    const cellA = `A${currentRow}`;
+    const cellF = `F${currentRow}`;
+    const cellH = `H${currentRow}`;
+    const cellI = `I${currentRow}`;
+
+    // Check if the row is a date row or total row
+    // Assuming date rows have text in Column A and 'TOTAL' in Column A is the total row
+    const rowRange = `Detailed Report!A${currentRow}:J${currentRow}`;
+    
+    // Fetch the value of Column A to determine row type
+    // Note: For batch formatting without reading cell values, you might need to pass additional metadata or structure your data accordingly.
+
+    // For simplicity, assume that date rows do not have 'TOTAL' in Column A and that the last row is the total row.
+
+    if (i < dataLength - 1) { // Date rows
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 0,
+            endColumnIndex: 10,
+          },
+          cell: {
+            userEnteredFormat: {
+              backgroundColor: {
+                red: 220 / 255,
+                green: 234 / 255,
+                blue: 250 / 255, // #dceefa
+              },
+              textFormat: {
+                bold: true,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.backgroundColor,userEnteredFormat.textFormat.bold',
+        },
+      });
+
+      // Format Columns F, H, I as currency or number
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 5, // Column F
+            endColumnIndex: 6,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'CURRENCY',
+                pattern: 'GBP#,##0.00',
+              },
+              textFormat: {
+                bold: true,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat,userEnteredFormat.textFormat.bold',
+        },
+      });
+
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 7, // Column H
+            endColumnIndex: 8,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'NUMBER',
+                pattern: '0.00',
+              },
+              textFormat: {
+                bold: true,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat,userEnteredFormat.textFormat.bold',
+        },
+      });
+
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 8, // Column I
+            endColumnIndex: 9,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'NUMBER',
+                pattern: '0.00',
+              },
+              textFormat: {
+                bold: true,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat,userEnteredFormat.textFormat.bold',
+        },
+      });
+    } else { // Total row
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 0,
+            endColumnIndex: 10,
+          },
+          cell: {
+            userEnteredFormat: {
+              textFormat: {
+                bold: true,
+                fontSize: 12,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.textFormat.bold,userEnteredFormat.textFormat.fontSize',
+        },
+      });
+
+      // Format Columns F, H, I in Total row
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 5, // Column F
+            endColumnIndex: 6,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'CURRENCY',
+                pattern: 'GBP#,##0.00',
+              },
+              textFormat: {
+                bold: true,
+                fontSize: 12,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat,userEnteredFormat.textFormat.bold,userEnteredFormat.textFormat.fontSize',
+        },
+      });
+
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 7, // Column H
+            endColumnIndex: 8,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'NUMBER',
+                pattern: '0.00',
+              },
+              textFormat: {
+                bold: true,
+                fontSize: 12,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat,userEnteredFormat.textFormat.bold,userEnteredFormat.textFormat.fontSize',
+        },
+      });
+
+      requests.push({
+        repeatCell: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: currentRow - 1,
+            endRowIndex: currentRow,
+            startColumnIndex: 8, // Column I
+            endColumnIndex: 9,
+          },
+          cell: {
+            userEnteredFormat: {
+              numberFormat: {
+                type: 'NUMBER',
+                pattern: '0.00',
+              },
+              textFormat: {
+                bold: true,
+                fontSize: 12,
+              },
+            },
+          },
+          fields: 'userEnteredFormat.numberFormat,userEnteredFormat.textFormat.bold,userEnteredFormat.textFormat.fontSize',
+        },
+      });
+    }
+  }
+
+  // Execute all additional formatting requests
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: spreadsheetId,
+      requestBody: {
+        requests: requests,
+      },
+    });
+  }
+};
 
 app.post("/write-to-sheet", async (req, res) => {
   try {
